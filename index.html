@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCEANTRACE | Marine Oil Spill Detection & Vessel Attribution Platform</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <!-- Google Fonts for Tactical Clean Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="dark-theme">
+
+  <!-- Top Tactical Navigation Bar -->
+  <header class="top-nav">
+    <div class="nav-brand">
+      <div class="radar-pulse"></div>
+      <div class="brand-text">
+        <h1>OCEANTRACE</h1>
+        <span class="sub-tag">MARITIME SURVEILLANCE & ATTRIBUTION PLATFORM</span>
+      </div>
+    </div>
+
+    <!-- Real-Time Ocean Location Search Bar -->
+    <div class="location-search-wrap">
+      <div class="search-autocomplete-wrap">
+        <div class="search-input-group">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="nav-location-search" placeholder="Search ocean region or coords (e.g. Mumbai, Singapore, Houston)..." autocomplete="off">
+          <button class="btn btn-primary btn-sm" id="btn-nav-search">SEARCH</button>
+        </div>
+        <ul id="location-suggestions" class="location-suggestions-list" hidden></ul>
+      </div>
+    </div>
+
+    <div class="nav-metrics">
+      <div class="metric-pill">
+        <span class="status-dot live"></span>
+        <span class="pill-label">SENSOR</span>
+        <span class="pill-value" id="status-ais">Sentinel-1B SAR / GIBS</span>
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <!-- NASA GIBS Satellite Imagery Layer Toggle -->
+      <button class="btn btn-secondary" id="btn-satellite-toggle" title="Toggle NASA GIBS Satellite Imagery">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+        <span id="sat-btn-text">NASA GIBS</span>
+      </button>
+
+      <!-- Dark / Light Mode Toggle Button -->
+      <button class="btn btn-secondary theme-toggle-btn" id="btn-theme-toggle" title="Toggle Light / Dark Mode">
+        <span class="theme-icon-moon" id="theme-icon-moon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </span>
+        <span class="theme-icon-sun" id="theme-icon-sun" style="display:none;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+        </span>
+        <span id="theme-btn-text">Dark</span>
+      </button>
+
+      <button class="btn btn-primary" id="btn-run-analysis">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span>RUN ANALYSIS</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Navigation Tab Bar -->
+  <nav class="sub-tab-bar">
+    <button class="tab-btn active" data-view="view-map">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+      Tactical Map
+    </button>
+    <button class="tab-btn" data-view="view-vessels">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20a2.4 2.4 0 0 0 2 1 2.4 2.4 0 0 0 2-1 2.4 2.4 0 0 1 2-1 2.4 2.4 0 0 1 2 1 2.4 2.4 0 0 0 2 1 2.4 2.4 0 0 0 2-1 2.4 2.4 0 0 1 2-1 2.4 2.4 0 0 1 2 1 2.4 2.4 0 0 0 2 1 2.4 2.4 0 0 0 2-1"/><path d="M4 18 3 9l4-2 4 4 6-4 4 2-1 9"/><line x1="12" y1="4" x2="12" y2="9"/></svg>
+      Vessel Database (<span id="tab-vessels-count">5</span>)
+    </button>
+    <button class="tab-btn" data-view="view-simulate">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      Simulate / Ingest Incident
+    </button>
+    <button class="tab-btn" data-view="view-report">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Case Report
+    </button>
+    <button class="tab-btn" data-view="view-settings">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      API & Settings
+    </button>
+  </nav>
+
+  <!-- ================= VIEW 1: TACTICAL MAP ================= -->
+  <main class="view-content active" id="view-map">
+    <div class="dashboard-grid">
+      <!-- Left Sidebar: Satellite & Slick Intelligence -->
+      <aside class="sidebar-panel left-panel">
+        <div class="panel-section">
+          <div class="section-header">
+            <span class="section-tag">SAR OBSERVATION</span>
+            <h2 id="incident-id">SPILL-2026-SG-0492</h2>
+          </div>
+          <div class="info-row">
+            <span class="lbl">Location</span>
+            <span class="val text-highlight" id="spill-region">Singapore Strait (Eastern)</span>
+          </div>
+          <div class="info-row">
+            <span class="lbl">Centroid Coords</span>
+            <span class="val font-mono" id="spill-coords">1.2840° N, 104.1250° E</span>
+          </div>
+          <div class="info-row">
+            <span class="lbl">Nearest Port</span>
+            <span class="val text-highlight" id="spill-nearest-port">Port of Singapore (15.5 km)</span>
+          </div>
+          <div class="info-row">
+            <span class="lbl">Sensor Type</span>
+            <span class="val">C-Band SAR & NASA GIBS</span>
+          </div>
+          <div class="info-row">
+            <span class="lbl">Observation Time</span>
+            <span class="val font-mono" id="spill-time">2026-09-09 14:30 UTC</span>
+          </div>
+        </div>
+
+        <!-- Slick Geometry Card -->
+        <div class="panel-section">
+          <h3 class="section-title">Geometric Characterization</h3>
+          <div class="stats-grid">
+            <div class="stat-box">
+              <span class="stat-number" id="val-area">14.82</span>
+              <span class="stat-unit">km²</span>
+              <span class="stat-label">Slick Area</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-number" id="val-perimeter">26.4</span>
+              <span class="stat-unit">km</span>
+              <span class="stat-label">Perimeter</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-number" id="val-age">6.5</span>
+              <span class="stat-unit">hrs</span>
+              <span class="stat-label">Estimated Age</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-number" id="val-vol">185.3</span>
+              <span class="stat-unit">m³</span>
+              <span class="stat-label">Est. Volume</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Oceanographic & Meteorological Conditions -->
+        <div class="panel-section">
+          <h3 class="section-title">Hydrodynamic Drift Parameters</h3>
+          <div class="param-list">
+            <div class="param-item">
+              <div class="param-title">Surface Ocean Current</div>
+              <div class="param-val"><span id="val-current-spd">0.75</span> kt &bull; heading <span id="val-current-dir">245°</span></div>
+            </div>
+            <div class="param-item">
+              <div class="param-title">Surface Wind Velocity</div>
+              <div class="param-val"><span id="val-wind-spd">13.5</span> kt &bull; from <span id="val-wind-dir">55°</span></div>
+            </div>
+            <div class="param-item">
+              <div class="param-title">Physical Drift Formulation</div>
+              <div class="param-desc font-mono">V_drift = V_current + 0.032*V_wind (+12° Coriolis)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Origin Estimation Window -->
+        <div class="panel-section highlight-box">
+          <h3 class="section-title text-amber">Estimated Origin Window</h3>
+          <div class="info-row">
+            <span class="lbl">Centroid</span>
+            <span class="val font-mono" id="origin-coord">1.3480° N, 104.2620° E</span>
+          </div>
+          <div class="info-row">
+            <span class="lbl">Release Window</span>
+            <span class="val font-mono" id="origin-time">07:30 - 08:30 UTC</span>
+          </div>
+          <div class="info-row">
+            <span class="lbl">Uncertainty Radius</span>
+            <span class="val" id="origin-radius">1.85 NM (3.4 km)</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: Interactive Tactical Map Viewport -->
+      <section class="map-container">
+        <div id="tactical-map"></div>
+
+        <!-- Map Floating Overlay Legend -->
+        <div class="map-legend">
+          <div class="legend-header">TACTICAL LAYERS</div>
+          <div class="legend-item">
+            <span class="legend-color slick-fill"></span>
+            <span>SAR Oil Slick Boundary</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-color origin-ring"></span>
+            <span>Estimated Origin Window</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-line hindcast-line"></span>
+            <span>Backward Drift (Hindcast)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-line forecast-line"></span>
+            <span>Forward Drift (12h Forecast)</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-icon ship-suspect">▲</span>
+            <span>High Suspect Vessel</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-icon ship-normal">▲</span>
+            <span>Filtered Marine Traffic</span>
+          </div>
+        </div>
+
+        <!-- Map Quick Stats Pill -->
+        <div class="map-floating-status" id="map-status-pill">
+          <span class="status-indicator ready"></span>
+          <span id="map-status-text">Synchronized with AIS radar network</span>
+        </div>
+      </section>
+
+      <!-- Right Sidebar: Attribution Ranking & Forensic Evidence -->
+      <aside class="sidebar-panel right-panel">
+        <div class="panel-section">
+          <div class="section-header">
+            <span class="section-tag">ATTRIBUTION ENGINE</span>
+            <h2>Candidate Vessels</h2>
+          </div>
+          <p class="panel-subtext">Spatio-temporal correlation across historical AIS tracks evaluated against origin window.</p>
+        </div>
+
+        <!-- Ranked Vessels List -->
+        <div class="vessels-list" id="vessels-container">
+          <div class="loading-placeholder">Loading AIS traffic correlation...</div>
+        </div>
+
+        <!-- Formula Documentation Footer -->
+        <div class="scoring-formula-box">
+          <div class="formula-title">Multi-Factor Scoring Matrix</div>
+          <div class="formula-chips">
+            <span class="chip">Proximity: 35%</span>
+            <span class="chip">Time: 25%</span>
+            <span class="chip">Trajectory: 20%</span>
+            <span class="chip">Ship Type: 10%</span>
+            <span class="chip">Anomalies: 10%</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <!-- ================= VIEW 2: VESSEL DATABASE TABLE ================= -->
+  <section class="view-content" id="view-vessels">
+    <div class="content-container">
+      <div class="table-header-bar">
+        <div>
+          <h2>AIS Vessel Radar Registry</h2>
+          <p class="panel-subtext">All marine traffic detected within the origin spatial-temporal bounding box.</p>
+        </div>
+        <div class="table-controls">
+          <input type="text" id="vessel-search-input" class="search-input" placeholder="Search by name, MMSI, or type...">
+          <select id="vessel-filter-select" class="filter-select">
+            <option value="ALL">All Vessels</option>
+            <option value="HIGH">High Suspects Only (>=80%)</option>
+            <option value="MODERATE">Moderate Relevance (50-79%)</option>
+            <option value="LOW">Filtered Traffic (<50%)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="tactical-table" id="vessels-full-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Vessel Name</th>
+              <th>MMSI / Flag</th>
+              <th>Vessel Type</th>
+              <th>CPA Distance</th>
+              <th>Time Offset</th>
+              <th>Speed at CPA</th>
+              <th>Attribution Score</th>
+              <th>Classification</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="vessels-table-body">
+            <!-- Dynamic rows -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= VIEW 3: SIMULATE / INGEST INCIDENT ================= -->
+  <section class="view-content" id="view-simulate">
+    <div class="content-container narrow">
+      <div class="form-header">
+        <h2>Simulate Custom Incident or Ingest Data</h2>
+        <p class="panel-subtext">Test the hydrodynamic drift and attribution algorithms on any ocean coordinates worldwide.</p>
+      </div>
+
+      <!-- Real-Time Maritime Ports & Sector Traffic Explorer -->
+      <div class="ports-section">
+        <div class="table-header-bar">
+          <div>
+            <h3>Real-Time Ports & Fairways Intelligence</h3>
+            <p class="panel-subtext">Commercial terminals, fairway channels, and vessel density in the current sector.</p>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-refresh-ports">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Fetch Live Ports
+          </button>
+        </div>
+        <div class="ports-grid" id="simulator-ports-grid">
+          <div class="loading-placeholder">Loading sector port intelligence...</div>
+        </div>
+      </div>
+
+      <form id="custom-incident-form" class="tactical-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Incident / Zone Name</label>
+            <input type="text" id="inp-region" value="Arabian Sea Fairway" required>
+          </div>
+          <div class="form-group">
+            <label>Estimated Slick Area (km²)</label>
+            <input type="number" step="0.1" id="inp-area" value="16.5" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Observation Latitude (°)</label>
+            <input type="number" step="0.0001" id="inp-lat" value="18.9200" required>
+            <span class="field-hint">e.g. 18.92 for Mumbai Approaches</span>
+          </div>
+          <div class="form-group">
+            <label>Observation Longitude (°)</label>
+            <input type="number" step="0.0001" id="inp-lon" value="72.8300" required>
+            <span class="field-hint">e.g. 72.83 for Arabian Sea</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Surface Current Speed (knots)</label>
+            <input type="number" step="0.1" id="inp-current-spd" value="0.85" required>
+          </div>
+          <div class="form-group">
+            <label>Surface Current Direction (° to)</label>
+            <input type="number" step="1" id="inp-current-dir" value="215" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Surface Wind Speed (knots)</label>
+            <input type="number" step="0.1" id="inp-wind-spd" value="14.0" required>
+          </div>
+          <div class="form-group">
+            <label>Surface Wind Direction (° from)</label>
+            <input type="number" step="1" id="inp-wind-dir" value="45" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Estimated Age of Slick (hours)</label>
+          <input type="number" step="0.5" id="inp-age" value="6.0" required>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary large-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Generate & Activate Incident Simulation
+          </button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- ================= VIEW 4: IMO AUDIT REPORT ================= -->
+  <section class="view-content" id="view-report">
+    <div class="content-container narrow">
+      <div class="report-actions-bar">
+        <button class="btn btn-secondary" id="btn-print-report">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print / Export Official PDF Report
+        </button>
+      </div>
+
+      <!-- Printable Report Document -->
+      <article class="audit-document" id="printable-dossier">
+        <header class="doc-header">
+          <div class="doc-title-box">
+            <span class="doc-badge">OFFICIAL MARITIME CASUALTY & POLLUTION DOSSIER</span>
+            <h1 id="rep-case-id">CASE REPORT: VALKYRIE STAR</h1>
+            <p class="doc-sub">Spatio-Temporal Forensic Tracking & Environmental Valuation Dossier</p>
+          </div>
+          <div class="doc-stamp">FORENSIC CASE DOSSIER</div>
+        </header>
+
+        <section class="doc-section">
+          <h3>1. INCIDENT & REMOTE SENSING SUMMARY</h3>
+          <table class="doc-table">
+            <tr><th>Region of Observation</th><td id="rep-region">Singapore Strait TSS</td></tr>
+            <tr><th>Satellite Sensor</th><td id="rep-sensor">Sentinel-1B SAR C-Band & NASA GIBS</td></tr>
+            <tr><th>Observation Timestamp</th><td class="font-mono" id="rep-time">2026-09-09 14:30 UTC</td></tr>
+            <tr><th>Slick Centroid</th><td class="font-mono" id="rep-centroid">1.2840° N, 104.1250° E</td></tr>
+            <tr><th>Delineated Surface Area</th><td id="rep-area">14.82 km²</td></tr>
+            <tr><th>Estimated Spill Volume</th><td id="rep-vol">185.3 m³ (Classification II)</td></tr>
+          </table>
+        </section>
+
+        <section class="doc-section">
+          <h3>2. HYDRODYNAMIC DRIFT & ORIGIN BACK-PROJECTION</h3>
+          <table class="doc-table">
+            <tr><th>Physical Model</th><td>Lagrangian Leeway Vector Addition (3.2% Wind + 12° Coriolis Deflection)</td></tr>
+            <tr><th>Estimated Release Window</th><td class="font-mono" id="rep-origin-time">07:30 - 08:30 UTC</td></tr>
+            <tr><th>Estimated Origin Centroid</th><td class="font-mono" id="rep-origin-coord">1.3480° N, 104.2620° E</td></tr>
+            <tr><th>Uncertainty Radius</th><td id="rep-origin-radius">1.85 NM (3.4 km)</td></tr>
+          </table>
+        </section>
+
+        <section class="doc-section highlight-report-section">
+          <h3>3. PRIMARY SUSPECT VESSEL IDENTIFICATION</h3>
+          <table class="doc-table">
+            <tr><th>Vessel Name</th><td class="bold text-danger" id="rep-suspect-name">VALKYRIE STAR</td></tr>
+            <tr><th>MMSI / Flag</th><td class="font-mono" id="rep-suspect-mmsi">352001948 (Panama)</td></tr>
+            <tr><th>Vessel Type / Tonnage</th><td id="rep-suspect-type">Crude Oil Tanker (VLCC) &bull; 305,000 DWT</td></tr>
+            <tr><th>Closest Point of Approach</th><td class="font-mono" id="rep-suspect-cpa">0.57 km from origin centroid</td></tr>
+            <tr><th>Time Offset at Origin</th><td class="font-mono" id="rep-suspect-time">+42 minutes from estimated discharge</td></tr>
+            <tr><th>Total Attribution Score</th><td class="bold font-mono text-danger" id="rep-suspect-score">92.1 / 100 (High Potential Source)</td></tr>
+          </table>
+        </section>
+
+        <section class="doc-section">
+          <h3>4. FORENSIC EVIDENCE & OBSERVED ANOMALIES</h3>
+          <ul class="report-evidence-list" id="rep-evidence-list">
+            <li>Intercepted within 0.57 km of hydrodynamic origin point.</li>
+            <li>Transit aligned with estimated release time window.</li>
+            <li>Sudden 52% speed reduction (14.1 kt to 6.8 kt) observed during origin transit.</li>
+            <li>36-minute AIS transponder blackout period recorded.</li>
+          </ul>
+        </section>
+
+        <!-- Section 5: Biological Effect & Environmental Impact -->
+        <section class="doc-section">
+          <h3>5. BIOLOGICAL & ECOLOGICAL IMPACT ASSESSMENT</h3>
+          <div class="bio-alert-bar">
+            <span id="rep-bio-severity">HIGH ENVIRONMENTAL TOXICITY</span>
+            <span>Est. Ecosystem Recovery: <span id="rep-bio-recovery">4 - 8 years</span></span>
+          </div>
+          <div class="report-bio-grid">
+            <div class="bio-card">
+              <div class="bio-card-title">Avifauna & Pelagic Vertebrates</div>
+              <div class="bio-card-body" id="rep-bio-fauna">High risk of plumage oiling and hypothermia for regional seabirds. Ingestion of toxic volatile hydrocarbons triggers severe gastrointestinal hemorrhaging.</div>
+            </div>
+            <div class="bio-card">
+              <div class="bio-card-title">Benthic Flora, Mangroves & Corals</div>
+              <div class="bio-card-body" id="rep-bio-benthic">Water-accommodated fractions (WAF) coat and asphyxiate intertidal mangrove pneumatophores, smothering phototrophic zooxanthellae in coral colonies.</div>
+            </div>
+            <div class="bio-card">
+              <div class="bio-card-title">Chemical Toxicity (PAHs)</div>
+              <div class="bio-card-body" id="rep-bio-chem">Elevated Polycyclic Aromatic Hydrocarbons (phenanthrene, chrysene) induce chronic bioaccumulation across trophic feeding levels.</div>
+            </div>
+            <div class="bio-card">
+              <div class="bio-card-title">Fisheries & Spawning Grounds</div>
+              <div class="bio-card-body" id="rep-bio-fisheries">Direct exposure to pelagic biomass, lethal embryonic developmental arrest in larvae, and closure of regional fishing waters.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 6: Estimated Economic Impact -->
+        <section class="doc-section">
+          <h3>6. ESTIMATED ECONOMIC IMPACT & VALUATION METHODOLOGY</h3>
+          <table class="econ-table">
+            <thead>
+              <tr>
+                <th>Damage & Remediation Category</th>
+                <th style="text-align:right;">Estimated Valuation (USD)</th>
+              </tr>
+            </thead>
+            <tbody id="rep-econ-table-body">
+              <!-- Populated dynamically via JS -->
+            </tbody>
+            <tfoot>
+              <tr class="econ-total-row">
+                <td>Total Estimated Economic Loss</td>
+                <td style="text-align:right;" id="rep-econ-total">$2,818,447</td>
+              </tr>
+            </tfoot>
+          </table>
+          <div class="econ-source-box">
+            <strong>Valuation Methodology & Citations:</strong><br>
+            Nonlinear Empirical Oil Spill Econometric Formulation: Total Loss = &Sigma;(C<sub>clean</sub> + C<sub>shoreline</sub> + C<sub>fishery</sub> + C<sub>port</sub> + C<sub>tourism</sub> + C<sub>nrda</sub>).<br>
+            Formulated and cross-verified according to international maritime casualty assessment standards:<br>
+            &bull; <a href="https://www.iopcfunds.org" target="_blank" class="source-link">International Oil Pollution Compensation Funds (IOPC) Claims Manual</a><br>
+            &bull; <a href="https://www.itopf.org" target="_blank" class="source-link">ITOPF Technical Information Paper: Oil Spill Cost Estimation Model</a>
+          </div>
+        </section>
+
+        <footer class="doc-footer">
+          <p><strong>LEGAL DISCLAIMER:</strong> This report is generated automatically by OCEANTRACE for preliminary investigative triaging and maritime interdiction. Physical gas chromatography hydrocarbon sampling is required for formal judicial proceedings.</p>
+        </footer>
+      </article>
+    </div>
+  </section>
+
+  <!-- ================= VIEW 5: API & SYSTEM SETTINGS ================= -->
+  <section class="view-content" id="view-settings">
+    <div class="content-container narrow">
+      <div class="form-header">
+        <h2>System Configuration & Live API Connectors</h2>
+        <p class="panel-subtext">Configure external maritime data keys or switch between live streams and calibrated baselines.</p>
+      </div>
+
+      <div class="panel-section">
+        <h3 class="section-title">AIS STREAM INTEGRATION</h3>
+        <p class="panel-subtext">Connect directly to global real-time ship transponders via <a href="https://aisstream.io" target="_blank" style="color:var(--accent-cyan);">AISStream.io</a> WebSocket.</p>
+        <div class="form-group mt-2">
+          <label>AISStream API Key</label>
+          <input type="password" id="inp-ais-key" placeholder="Paste your free AISStream API key here...">
+        </div>
+      </div>
+
+      <div class="panel-section mt-4">
+        <h3 class="section-title">OCEANOGRAPHIC DATA FEED</h3>
+        <p class="panel-subtext">Enable real-time marine currents and wind vectors from Open-Meteo Marine API.</p>
+        <div class="checkbox-row mt-2">
+          <input type="checkbox" id="chk-live-ocean">
+          <label for="chk-live-ocean">Use Live Marine Weather (Open-Meteo)</label>
+        </div>
+      </div>
+
+      <div class="panel-section mt-4">
+        <h3 class="section-title">DATABASE DIAGNOSTICS</h3>
+        <div class="info-row"><span class="lbl">Relational Storage</span><span class="val font-mono">SQLite3 (oceantrace.db)</span></div>
+        <div class="info-row"><span class="lbl">Active Incident</span><span class="val font-mono" id="diag-incident">SPILL-2026-SG-0492</span></div>
+        <div class="info-row"><span class="lbl">Drift Engine</span><span class="val">Lagrangian 3.2% Leeway + Coriolis</span></div>
+      </div>
+
+      <div class="form-actions mt-4">
+        <button class="btn btn-primary" id="btn-save-settings">Save & Apply Settings</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Analysis Pipeline Modal Overlay -->
+  <div class="modal-backdrop" id="analysis-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="radar-pulse"></div>
+        <h3>EXECUTING OCEANTRACE PIPELINE</h3>
+      </div>
+      <p class="modal-desc">Multi-modal satellite SAR and AIS correlation pipeline in progress.</p>
+      
+      <!-- Stepper List -->
+      <div class="pipeline-stepper" id="pipeline-stepper">
+        <div class="step-item active" data-step="1">
+          <span class="step-num">1</span>
+          <span class="step-label">Ingesting Sentinel-1 SAR backscatter imagery...</span>
+        </div>
+        <div class="step-item" data-step="2">
+          <span class="step-num">2</span>
+          <span class="step-label">Segmenting dark slick candidate & calculating geometry</span>
+        </div>
+        <div class="step-item" data-step="3">
+          <span class="step-num">3</span>
+          <span class="step-label">Retrieving hydrodynamic ocean currents and wind vectors</span>
+        </div>
+        <div class="step-item" data-step="4">
+          <span class="step-num">4</span>
+          <span class="step-label">Running Lagrangian backward drift hindcast to origin</span>
+        </div>
+        <div class="step-item" data-step="5">
+          <span class="step-num">5</span>
+          <span class="step-label">Establishing spatial-temporal release window and uncertainty ellipse</span>
+        </div>
+        <div class="step-item" data-step="6">
+          <span class="step-num">6</span>
+          <span class="step-label">Querying historical AIS traffic & computing Closest Point of Approach (CPA)</span>
+        </div>
+        <div class="step-item" data-step="7">
+          <span class="step-num">7</span>
+          <span class="step-label">Applying 5-factor multi-criteria attribution algorithm</span>
+        </div>
+        <div class="step-item" data-step="8">
+          <span class="step-num">8</span>
+          <span class="step-label">Compiling forensic evidence dossier</span>
+        </div>
+      </div>
+
+      <div class="modal-progress-bar">
+        <div class="bar-fill" id="pipeline-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Evidence Dossier Modal -->
+  <div class="modal-backdrop" id="evidence-modal">
+    <div class="modal-card large">
+      <div class="modal-header">
+        <div>
+          <span class="badge badge-danger" id="modal-suspect-tier">HIGH POTENTIAL SOURCE</span>
+          <h3 id="modal-vessel-name">VALKYRIE STAR</h3>
+        </div>
+        <button class="modal-close" id="btn-close-modal">&times;</button>
+      </div>
+
+      <div class="dossier-body">
+        <!-- Left: Ship specs -->
+        <div class="dossier-col">
+          <h4 class="dossier-subtitle">VESSEL IDENTIFIERS</h4>
+          <table class="dossier-table">
+            <tr><td>MMSI</td><td class="font-mono" id="dossier-mmsi">352001948</td></tr>
+            <tr><td>Vessel Type</td><td id="dossier-type">Crude Oil Tanker (VLCC)</td></tr>
+            <tr><td>Flag</td><td id="dossier-flag">Panama</td></tr>
+            <tr><td>Dimensions</td><td id="dossier-dim">333m &times; 60m</td></tr>
+            <tr><td>Deadweight Tonnage</td><td id="dossier-dwt">305,000 DWT</td></tr>
+          </table>
+
+          <h4 class="dossier-subtitle mt-4">CLOSEST APPROACH TO ORIGIN</h4>
+          <table class="dossier-table">
+            <tr><td>CPA Distance</td><td class="text-amber font-mono" id="dossier-cpa-dist">0.57 km</td></tr>
+            <tr><td>Time Offset</td><td class="font-mono" id="dossier-time-offset">+42 mins from release</td></tr>
+            <tr><td>Speed at Origin</td><td class="font-mono" id="dossier-speed">6.8 knots (Abnormal drop)</td></tr>
+            <tr><td>Course</td><td class="font-mono" id="dossier-course">242°</td></tr>
+          </table>
+        </div>
+
+        <!-- Right: Attribution Score Breakdown & Anomalies -->
+        <div class="dossier-col">
+          <div class="total-score-card">
+            <span class="total-score-lbl">ATTRIBUTION SCORE</span>
+            <span class="total-score-val" id="dossier-total-score">92.1 / 100</span>
+          </div>
+
+          <h4 class="dossier-subtitle">FACTOR BREAKDOWN</h4>
+          <div class="breakdown-bars" id="dossier-breakdown-bars">
+            <!-- Populated via JS -->
+          </div>
+
+          <h4 class="dossier-subtitle mt-4">OBSERVED ANOMALIES & FORENSIC EVIDENCE</h4>
+          <ul class="evidence-checklist" id="dossier-evidence-list">
+            <!-- Populated via JS -->
+          </ul>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <span class="legal-disclaimer">IMO Compliance Note: System classifies correlation probability. Physical oil fingerprinting required for legal enforcement.</span>
+        <button class="btn btn-secondary" id="btn-close-modal-2">Close Dossier</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
